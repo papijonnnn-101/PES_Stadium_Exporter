@@ -2163,16 +2163,17 @@ class New_STID(bpy.types.Operator):
                                     if not tex_dir:
                                         continue
 
-                                    found = re.search(r"st\d{3}", tex_dir.lower())
+                                    found = re.search(r"st\d{3}", tex_dir, re.IGNORECASE)
                                     if not found:
                                         continue
 
-                                    old_id = found.group(0)
+                                    old_id = found.group(0).lower()
+                                    new_id = stid.lower()
 
-                                    if old_id == stid.lower():
+                                    if old_id == new_id:
                                         continue
 
-                                    new_dir = tex_dir.lower().replace(old_id, stid.lower())
+                                    new_dir = re.sub(r"st\d{3}", new_id, tex_dir, flags=re.IGNORECASE)
                                     node.fmdl_texture_directory = new_dir
 
                                     id_changed = True
