@@ -45,7 +45,7 @@ bl_info = {
 	"name": "PES Stadium Exporter",
 	"description": "eFootbal PES2021 PES Stadium Exporter",
 	"author": "MjTs-140914 || the4chancup",
-	"version": (1, 0, 1),
+	"version": (1, 0, 0),
 	"blender": (5, 00, 0),
 	"location": "Under Scene Tab",
 	# "warning": "This addon is still in development.",
@@ -530,8 +530,6 @@ def valid_key(context):
 		return False, msg
 
 	return True, msg
-
-
 
 def Create_Parent_Part(self, context):
 
@@ -4436,9 +4434,6 @@ class FMDL_OP_AutoParentOrganizer(bpy.types.Operator):
                 yield c
                 yield from walk(c)
 
-        # ===================================================================
-        # RE-PARENT MESH OBJECTS
-        # ===================================================================
         for obj in walk(MAIN):
             if obj.type != "MESH":
                 continue
@@ -4447,7 +4442,6 @@ class FMDL_OP_AutoParentOrganizer(bpy.types.Operator):
             base_name = name_lower.replace("mesh_", "") if name_lower.startswith("mesh_") else name_lower
             target_parent = None
 
-            # PRIORITY CASE
             if base_name.startswith("front1_game"):
                 target_parent = "MESH_front1_game"
             elif base_name.startswith("front1_demo"):
@@ -4459,14 +4453,12 @@ class FMDL_OP_AutoParentOrganizer(bpy.types.Operator):
             elif base_name.startswith("center1_tifo"):
                 target_parent = "MESH_center1_tifo"
 
-            # STANDARD CASE
             if not target_parent:
                 for p in valid_parents:
                     if base_name.startswith(p.replace("MESH_", "").lower()):
                         target_parent = p
                         break
 
-            # DEFAULT FALLBACK → MESH_center1
             if not target_parent:
                 target_parent = "MESH_center1"
                 print(f"[DEFAULT] {obj.name} → MESH_center1 (not matched valid parents)")
@@ -4478,9 +4470,6 @@ class FMDL_OP_AutoParentOrganizer(bpy.types.Operator):
                 moved += 1
                 print(f"Reparent: {obj.name} → {target_parent} (Old: {old_parent})")
 
-        # ===================================================================
-        # FIX ENSURE MESH_xxx inside xxx
-        # ===================================================================
         base_names = [
             "back1","back2","back3",
             "front1","front2","front3",
@@ -4499,9 +4488,7 @@ class FMDL_OP_AutoParentOrganizer(bpy.types.Operator):
                 moved += 1
                 print(f"[FIX] Move {mesh_obj.name} → {parent_obj.name} (Old: {old_parent})")
 
-        # ===================================================================
-        # CLEAN INVALID EMPTY PARENTS UNDER MAIN
-        # ===================================================================
+
         for obj in list(walk(MAIN)):
             if obj.type != "EMPTY":
                 continue
