@@ -12,8 +12,13 @@ from . import FmdlFile, FmdlMeshSplitting, FmdlSplitVertexEncoding, Ftex, PesSke
 from collections import defaultdict
 
 
-class UnsupportedFmdl(Exception):
-	pass
+FMDL_UV_LAYER_NAMES = [
+	'UVMap',
+	'normal_map',
+	'uv_rain',
+	'uv_map_ext',
+]
+
 
 class FmdlExportError(Exception):
 	def __init__(self, errors):
@@ -84,8 +89,8 @@ def createFittingBoundingBox(context, meshObject):
 
 
 def importFmdl(context, fmdl, filename, importSettings = None):
-	UV_MAP_COLOR = 'UVMap'
-	UV_MAP_NORMALS = 'normal_map'
+	UV_MAP_COLOR = FMDL_UV_LAYER_NAMES[0]
+	UV_MAP_NORMALS = FMDL_UV_LAYER_NAMES[1]
 	def findTexture(texture, textureSearchPath):
 		textureFilename = texture.directory.replace('\\', '/').rstrip('/') + '/' + texture.filename.replace('\\', '/').lstrip('/')
 		textureFilenameComponents = tuple(filter(None, textureFilename.split('/')))
@@ -388,22 +393,19 @@ def importFmdl(context, fmdl, filename, importSettings = None):
 			colorLayer.active = False
 			colorLayer.active_render = False
 
-		if mesh.vertexFields.uvCount >= 1:
-			uvTexture = blenderMesh.uv_layers.new(name=UV_MAP_COLOR)
-			uvLayer = blenderMesh.uv_layers[uvTexture.name]
-			uvLayer.data.foreach_set("uv", tuple(itertools.chain.from_iterable([
-				(vertex.uv[0].u, 1.0 - vertex.uv[0].v) for vertex in loopVertices
-			])))
-			uvTexture.active = True
-			uvTexture.active_clone = True
-			uvTexture.active_render = True
-
-		if mesh.vertexFields.uvCount >= 2 and 0 not in mesh.vertexFields.uvEqualities[1]:
-			uvTexture = blenderMesh.uv_layers.new(name=UV_MAP_NORMALS)
-			uvLayer = blenderMesh.uv_layers[uvTexture.name]
-			uvLayer.data.foreach_set("uv", tuple(itertools.chain.from_iterable([
-				(vertex.uv[1].u, 1.0 - vertex.uv[1].v) for vertex in loopVertices
-			])))
+		for uv_index, uv_name in enumerate(FMDL_UV_LAYER_NAMES):
+			if mesh.vertexFields.uvCount > uv_index:
+				if uv_index >= 1 and (uv_index - 1) in mesh.vertexFields.uvEqualities[uv_index]:
+					continue
+				uvTexture = blenderMesh.uv_layers.new(name=uv_name)
+				uvLayer = blenderMesh.uv_layers[uvTexture.name]
+				uvLayer.data.foreach_set("uv", tuple(itertools.chain.from_iterable([
+					(vertex.uv[uv_index].u, 1.0 - vertex.uv[uv_index].v) for vertex in loopVertices
+				])))
+				if uv_index == 0:
+					uvTexture.active = True
+					uvTexture.active_clone = True
+					uvTexture.active_render = True
 
 		blenderMesh.materials.append(blenderMaterial)
 
@@ -474,8 +476,14 @@ def importFmdl(context, fmdl, filename, importSettings = None):
 		meshGroupID = blenderMeshGroupObject.name
 		for child in meshGroup.children:
 			childID = addMeshGroup(context, child, meshObjectIDs, importBoundingBoxMode)
-			bpy.data.objects[childID].parent = bpy.data.objects[meshGroupID]
-			bpy.data.objects[meshGroupID].parent = bpy.data.objects[importSettings.parents]
+			# Guard: prevent self-parenting (Wembley/Ibrox fix)
+			if childID != meshGroupID:
+				bpy.data.objects[childID].parent = bpy.data.objects[meshGroupID]
+		if importSettings.parents and importSettings.parents != meshGroupID:
+			try:
+				bpy.data.objects[meshGroupID].parent = bpy.data.objects[importSettings.parents]
+			except Exception:
+				pass
 		return meshGroupID
 	
 	def importMeshTree(context, fmdl, meshObjectIDs, armatureObjectID, filename, importBoundingBoxMode):
@@ -698,7 +706,7 @@ def exportFmdl(context, rootObjectName, exportSettings=None):
 		return (orderedBones, bonesByName)
 	
 	
-	def exportMeshGeometry(blenderMeshObject, colorLayer, uvLayerColor, uvLayerNormal, boneVector, scene):
+	def exportMeshGeometry(blenderMeshObject, colorLayer, uvLayerNames, boneVector, scene):
 		#
 		# Setup a modified version of the mesh data that can be fiddled with.
 		#
@@ -723,11 +731,9 @@ def exportFmdl(context, rootObjectName, exportSettings=None):
 			blenderBmesh.free()
 		
 		# modifiedBlenderMesh.use_auto_smooth = True
+		uvLayerColor = uvLayerNames[0]
 		modifiedBlenderMesh.calc_tangents(uvmap=uvLayerColor)
-		if uvLayerNormal is None:
-			uvLayerTangent = uvLayerColor
-		else:
-			uvLayerTangent = uvLayerNormal
+		uvLayerTangent = uvLayerNames[1] if len(uvLayerNames) >= 2 else uvLayerColor
 		modifiedBlenderMesh.calc_tangents(uvmap=uvLayerTangent)
 		
 		class Vertex:
@@ -826,14 +832,10 @@ def exportFmdl(context, rootObjectName, exportSettings=None):
 			
 			if colorLayer is not None:
 				loop.color = [c for c in modifiedBlenderMesh.vertex_colors[colorLayer].data[i].color] + [1.0]
-			loop.uv.append(FmdlFile.FmdlFile.Vector2(
-				modifiedBlenderMesh.uv_layers[uvLayerColor].data[i].uv[0],
-				1.0 - modifiedBlenderMesh.uv_layers[uvLayerColor].data[i].uv[1],
-			))
-			if uvLayerNormal != None:
+			for uvLayerName in uvLayerNames:
 				loop.uv.append(FmdlFile.FmdlFile.Vector2(
-					modifiedBlenderMesh.uv_layers[uvLayerNormal].data[i].uv[0],
-					1.0 - modifiedBlenderMesh.uv_layers[uvLayerNormal].data[i].uv[1],
+					modifiedBlenderMesh.uv_layers[uvLayerName].data[i].uv[0],
+					1.0 - modifiedBlenderMesh.uv_layers[uvLayerName].data[i].uv[1],
 				))
 			
 			found = False
@@ -883,37 +885,26 @@ def exportFmdl(context, rootObjectName, exportSettings=None):
 		return (fmdlVertices, fmdlFaces)
 
 	def ExportUVMaps(blenderMaterial, blenderMesh, name, vertexFields):
-		colorUvMaps = defaultdict(int)
-		normalUvMaps = defaultdict(int)
-		for uv in blenderMesh.uv_layers:
-			if uv.name == 'UVMap':
-				colorUvMaps[uv.name] = 1
-			else:
-				normalUvMaps[uv.name] = 1
-				
-		if len(normalUvMaps) == 0:
-			normalUvMaps = colorUvMaps
-
-		if len(colorUvMaps) == 0:
+		availableUvMaps = [uv.name for uv in blenderMesh.uv_layers]
+		if len(availableUvMaps) == 0:
 			raise FmdlExportError("Mesh '%s' does not have a primary UV map set." % name)
-		if len(colorUvMaps) > 1:
-			raise FmdlExportError(
-				f"Mesh '{name}' has more than one primary UV maps: {colorUvMaps}")
-		if len(normalUvMaps) == 0:
-			raise FmdlExportError("Mesh '%s' does not have a normals UV map set." % name)
-		if len(normalUvMaps) > 1:
-			raise FmdlExportError(f"Mesh '{name}' has more than one normals UV map set: {normalUvMaps}")
-		
-		uvLayerColor = [*colorUvMaps][0]
-		uvLayerNormal = [*normalUvMaps][0]
-		vertexFields.uvCount = 1
-		
-		if uvLayerNormal == uvLayerColor:
-			uvLayerNormal = None
-		else:
-			vertexFields.uvCount += 1
-		return uvLayerColor, uvLayerNormal
-	
+		unexpectedUvMaps = [n for n in availableUvMaps if n not in FMDL_UV_LAYER_NAMES]
+		if unexpectedUvMaps:
+			raise FmdlExportError("Mesh '%s' has unsupported UV map name(s): %s" % (name, unexpectedUvMaps))
+		uvLayerNames = []
+		for expected in FMDL_UV_LAYER_NAMES:
+			if expected in availableUvMaps:
+				uvLayerNames.append(expected)
+			else:
+				break
+		if not uvLayerNames:
+			raise FmdlExportError("Mesh '%s' does not have a primary UVMap layer." % name)
+		for expected in FMDL_UV_LAYER_NAMES[len(uvLayerNames):]:
+			if expected in availableUvMaps:
+				raise FmdlExportError("Mesh '%s' has UV map '%s' but is missing previous UV layer(s)." % (name, expected))
+		vertexFields.uvCount = len(uvLayerNames)
+		return uvLayerNames
+
 	def exportMesh(blenderMeshObject, materialFmdlObjects, bonesByName, scene):
 		blenderMesh = blenderMeshObject.data
 		name = blenderMeshObject.name
@@ -940,14 +931,13 @@ def exportFmdl(context, rootObjectName, exportSettings=None):
 		blenderMaterial = materials[0]
 		
 		vertexFields.uvCount = 0
-		(uvLayerColor, uvLayerNormal) = ExportUVMaps(blenderMaterial, blenderMesh, name, vertexFields)
+		uvLayerNames = ExportUVMaps(blenderMaterial, blenderMesh, name, vertexFields)
 		
 		boneVector = [bonesByName[vertexGroup.name] for vertexGroup in blenderMeshObject.vertex_groups]
 		if len(boneVector) > 0:
 			vertexFields.hasBoneMapping = True
 		
-		(vertices, faces) = exportMeshGeometry(blenderMeshObject, colorLayer, uvLayerColor, uvLayerNormal, boneVector,
-											   scene)
+		(vertices, faces) = exportMeshGeometry(blenderMeshObject, colorLayer, uvLayerNames, boneVector, scene)
 		
 		mesh = FmdlFile.FmdlFile.Mesh()
 		mesh.vertices = vertices

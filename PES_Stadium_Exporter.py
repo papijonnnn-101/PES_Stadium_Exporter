@@ -32,8 +32,7 @@
 #     Suat Cadgas/sxsxsx
 #     themex
 #     zlac
-# 	  bluestillidie00
-#     papijonnnnn
+# '''
 
 import bpy, os, bpy.utils.previews, bpy_extras, shutil, bmesh, re, math
 from struct import pack,unpack
