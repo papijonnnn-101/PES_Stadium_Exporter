@@ -84,6 +84,9 @@ group_list = [
 
 parent_main_list = (
     [f"MESH_{s}{i}" for s in ["back","center","front","left","right"] for i in range(1,4)]
+    + [f"MESH_{s}{i}_detail" for s in ["back","center","front","left","right"] for i in range(1,4)]
+    + [f"MESH_{s}{i}_probe"  for s in ["back","center","front","left","right"] for i in range(1,4)]
+    + ["MESH_field","MESH_cover"]
     + ["MESH_Pitch","MESH_front1_demo","MESH_front1_game",
        "MESH_center1_snow","MESH_center1_rain","MESH_center1_tifo"]
     + [f"MESH_ad_{ad}" for ad in ["acl","cl","el","normal","olc","sc"]]
@@ -98,6 +101,9 @@ parent_main_list = (
 
 main_list = (
     [f"{s}{i}" for s in ["back","center","front","left","right"] for i in range(1,4)]
+    + [f"{s}{i}_detail" for s in ["back","center","front","left","right"] for i in range(1,4)]
+    + [f"{s}{i}_probe"  for s in ["back","center","front","left","right"] for i in range(1,4)]
+    + ["field","cover"]
     + ["front1_demo","front1_game","center1_snow","center1_rain","center1_tifo",
        "MESH_CROWD","MESH_FLAGAREA","Pitch"]
     + [f"TV_Large_{x}" for x in ["Left","Right","Front","Back"]]
@@ -162,6 +168,54 @@ datalist = (
     [f"{s}{i}" for s in ["back","center","front","left","right"] for i in range(1,4)]
     + ["center1_snow","center1_rain","center1_tifo","front1_game","front1_demo"]
 )
+
+# ── _detail parts ─────────────────────────────────────────────────────────────
+datalist_detail = [f"{s}{i}_detail" for s in ["back","center","front","left","right"] for i in range(1,4)]
+StadiumModel_detail = [f"StadiumModel_{s.upper()[0]}{i}_detail" for s in ["back","center","front","left","right"] for i in range(1,4)]
+StadiumKind_detail  = ([0,1,2] * 5)
+StadiumDir_detail   = ([1,1,1] + [4,4,0] + [0,0,0] + [2,2,2] + [3,3,3])
+transformlist_detail   = [0x0000C000,0x0000C100,0x0000C200,0x0000C300,0x0000C400,
+                           0x0000C500,0x0000C600,0x0000C700,0x0000C800,0x0000C900,
+                           0x0000CA00,0x0000CB00,0x0000CC00,0x0000CD00,0x0000CE00]
+TransformEntity_detail = [0x0000D000,0x0000D100,0x0000D200,0x0000D300,0x0000D400,
+                           0x0000D500,0x0000D600,0x0000D700,0x0000D800,0x0000D900,
+                           0x0000DA00,0x0000DB00,0x0000DC00,0x0000DD00,0x0000DE00]
+shearTransform_detail  = [0x00000000] * 15
+pivotTransform_detail  = [0x00000000] * 15
+
+# ── _probe parts ──────────────────────────────────────────────────────────────
+datalist_probe = [f"{s}{i}_probe" for s in ["back","center","front","left","right"] for i in range(1,4)]
+StadiumModel_probe = [f"StadiumModel_{s.upper()[0]}{i}_probe" for s in ["back","center","front","left","right"] for i in range(1,4)]
+StadiumKind_probe  = ([0,1,2] * 5)
+StadiumDir_probe   = ([1,1,1] + [4,4,0] + [0,0,0] + [2,2,2] + [3,3,3])
+transformlist_probe   = [0x0000E000,0x0000E100,0x0000E200,0x0000E300,0x0000E400,
+                          0x0000E500,0x0000E600,0x0000E700,0x0000E800,0x0000E900,
+                          0x0000EA00,0x0000EB00,0x0000EC00,0x0000ED00,0x0000EE00]
+TransformEntity_probe  = [0x0000F000,0x0000F100,0x0000F200,0x0000F300,0x0000F400,
+                           0x0000F500,0x0000F600,0x0000F700,0x0000F800,0x0000F900,
+                           0x0000FA00,0x0000FB00,0x0000FC00,0x0000FD00,0x0000FE00]
+shearTransform_probe   = [0x00000000] * 15
+pivotTransform_probe   = [0x00000000] * 15
+
+# ── field ─────────────────────────────────────────────────────────────────────
+datalist_field        = ["field"]
+StadiumModel_field    = ["center0001"]
+StadiumKind_field     = [0]
+StadiumDir_field      = [4]
+transformlist_field   = [0x00003400]
+TransformEntity_field = [0x00003500]
+shearTransform_field  = [0x00000000]
+pivotTransform_field  = [0x00000000]
+
+# ── cover ─────────────────────────────────────────────────────────────────────
+datalist_cover        = ["cover"]
+StadiumModel_cover    = ["cover0001"]
+StadiumKind_cover     = [0]
+StadiumDir_cover      = [4]
+transformlist_cover   = [0x0000CE00]
+TransformEntity_cover = [0x0000CF00]
+shearTransform_cover  = [0x00000000]
+pivotTransform_cover  = [0x00000000]
 
 StadiumModel = (
     [f"StadiumModel_{s.upper()[0]}{i}"
@@ -273,6 +327,8 @@ shaders = []
 L_Side = ["back","front","left","right"]
 
 L_P_List = ["L_BACK","L_FRONT","L_LEFT","L_RIGHT"]
+
+FMDL_UV_LAYER_NAMES = ["UVMap", "normal_map", "uv_rain", "uv_map_ext"]
 
 special_alp = {5, 7, 8}
 
@@ -658,6 +714,104 @@ def checkStadiumID(context, isParent):
                         return True
 
         return False
+
+
+def patchFieldToEnlighten(fox2XmlPath, stid):
+    import re
+    try:
+        with open(fox2XmlPath, 'r', encoding='utf-8') as f:
+            content = f.read()
+        if 'center0001' not in content:
+            return
+        content = content.replace(
+            'addr="0x00003400" unknown1="400"',
+            'addr="0x00003400" unknown1="448"'
+        )
+        content = re.sub(
+            r'class="StadiumModel" (classVersion="3") (addr="0x00003400")',
+            r'class="EnlightenStadiumModel" classVersion="1" \2',
+            content
+        )
+        if 'EnlightenStadiumModel' not in content:
+            content = content.replace(
+                '<class name="StadiumModel" super="" version="3" />',
+                '<class name="StadiumModel" super="" version="3" />\n\t\t<class name="EnlightenStadiumModel" super="" version="1" />'
+            )
+        if 'key="center0001"' not in content:
+            def bump_datalist_arraysize(m):
+                old_size = int(m.group(1))
+                return m.group(0).replace(
+                    'arraySize="%d"' % old_size,
+                    'arraySize="%d"' % (old_size + 1)
+                )
+            content = re.sub(
+                r'<property name="dataList" type="EntityPtr" container="StringMap" arraySize="(\d+)">',
+                bump_datalist_arraysize,
+                content,
+                count=1
+            )
+            dl_start = content.find('<property name="dataList"')
+            dl_end   = content.find('</property>', dl_start)
+            center_entry = '\n          <value key="center0001">0x00003400</value>'
+            content = content[:dl_end] + center_entry + '\n        ' + content[dl_end:]
+        search_from = 0
+        field_start = -1
+        while True:
+            pos = content.find('<value>center0001</value>', search_from)
+            if pos == -1:
+                break
+            nearby = content[max(0, pos - 200):pos]
+            if 'name="name"' in nearby or 'property name="name"' in nearby:
+                field_start = pos
+                break
+            search_from = pos + 1
+        if field_start == -1:
+            with open(fox2XmlPath, 'w', encoding='utf-8') as f:
+                f.write(content)
+            return
+        field_entity_end = content.find('</entity>', field_start)
+        static_end = content.rfind('</staticProperties>', field_start, field_entity_end)
+        prop_end   = content.rfind('</property>', field_start, static_end)
+        insert_at  = prop_end + len('</property>')
+        enlighten_props = (
+            '\n\t\t\t\t<property name="guid" type="String" container="StaticArray" arraySize="1">'
+            '\n\t\t\t\t\t<value>4d531d9e05278c4fb08bb48bcbd3658c</value>'
+            '\n\t\t\t\t</property>'
+            '\n\t\t\t\t<property name="enlightenQuality" type="int32" container="StaticArray" arraySize="1">'
+            '\n\t\t\t\t\t<value>2</value>'
+            '\n\t\t\t\t</property>'
+            '\n\t\t\t\t<property name="enlightenModelType" type="int32" container="StaticArray" arraySize="1">'
+            '\n\t\t\t\t\t<value>1</value>'
+            '\n\t\t\t\t</property>'
+            '\n\t\t\t\t<property name="outputPixelSize" type="float" container="StaticArray" arraySize="1">'
+            '\n\t\t\t\t\t<value>-1</value>'
+            '\n\t\t\t\t</property>'
+            '\n\t\t\t\t<property name="clusterSize" type="float" container="StaticArray" arraySize="1">'
+            '\n\t\t\t\t\t<value>-1</value>'
+            '\n\t\t\t\t</property>'
+            '\n\t\t\t\t<property name="simpMaxDistance" type="float" container="StaticArray" arraySize="1">'
+            '\n\t\t\t\t\t<value>0.4</value>'
+            '\n\t\t\t\t</property>'
+            '\n\t\t\t\t<property name="simpMaxInitialNormalDeviation" type="float" container="StaticArray" arraySize="1">'
+            '\n\t\t\t\t\t<value>30</value>'
+            '\n\t\t\t\t</property>'
+            '\n\t\t\t\t<property name="simpMaxGeneralNormalDeviation" type="float" container="StaticArray" arraySize="1">'
+            '\n\t\t\t\t\t<value>92</value>'
+            '\n\t\t\t\t</property>'
+            '\n\t\t\t\t<property name="simpExpansionFactor" type="float" container="StaticArray" arraySize="1">'
+            '\n\t\t\t\t\t<value>0.6</value>'
+            '\n\t\t\t\t</property>'
+            '\n\t\t\t\t<property name="simpSignificantAreaRatio" type="float" container="StaticArray" arraySize="1">'
+            '\n\t\t\t\t\t<value>0.1</value>'
+            '\n\t\t\t\t</property>'
+        )
+        if 'enlightenQuality' not in content[field_start:field_entity_end]:
+            content = content[:insert_at] + enlighten_props + content[insert_at:]
+        with open(fox2XmlPath, 'w', encoding='utf-8') as f:
+            f.write(content)
+        print('Field entity upgraded to EnlightenStadiumModel successfully')
+    except Exception as e:
+        print('patchFieldToEnlighten skipped: %s' % e)
 
 
 class FMDL_MaterialParameter(bpy.types.PropertyGroup):
@@ -2165,10 +2319,10 @@ class New_STID(bpy.types.Operator):
                                     if not found:
                                         continue
 
-                                    old_id = found.group(0).lower()
-                                    new_id = stid.lower()
+                                    old_id = found.group(0)
+                                    new_id = stid
 
-                                    if old_id == new_id:
+                                    if old_id.lower() == new_id.lower():
                                         continue
 
                                     new_dir = re.sub(r"st\d{3}", new_id, tex_dir, flags=re.IGNORECASE)
@@ -2567,8 +2721,11 @@ class FDMDL_OT_Import_Main_Stadium(bpy.types.Operator, bpy_extras.io_utils.Impor
 					filename, extension = os.path.splitext(fileName)
 					if extension.lower() == '.fmdl':
 						fmdlPath = os.path.join(root, fileName)
-						importFmdlfile(fmdlPath, "Skeleton_%s" % filename, filename, filename, getTextureDir, "MAIN")
-						print('Importing ==> %s' % fileName)
+						try:
+							importFmdlfile(fmdlPath, "Skeleton_%s" % filename, filename, filename, getTextureDir, "MAIN")
+							print('Importing ==> %s' % fileName)
+						except Exception as e:
+							print("Skipping %s — %s" % (fileName, format(e)))
 			remove_dir("%s\\%s_fpk"%(fpkdir,stid))
 			remove_file("%s\\%s.fpk.xml"%(fpkdir,stid))
 			print('Importing stadium succesfully...!')
@@ -3687,23 +3844,19 @@ def checkMeshMaterialUvs(self, context):
 								print("Mesh [%s] does not have a primary UV map set!" % ob2.name)
 								print(f"Check in {context.scene.part_info}-->{child.name}-->{ob.name}-->{ob2.name}!")
 								return True
-							elif len(uv) >= 3:
-								self.report({"WARNING"}, "Mesh [%s] too much UVMap slots, need to remove!" % ob2.name)
-								print("Mesh [%s] too much UVMap slots, need to remove!" % ob2.name)
+							elif len(uv) > 4:
+								self.report({"WARNING"}, "Mesh [%s] too much UVMap slots, max 4 allowed!" % ob2.name)
+								print("Mesh [%s] too much UVMap slots, max 4 allowed!" % ob2.name)
 								print(f"Check in {context.scene.part_info}-->{child.name}-->{ob.name}-->{ob2.name}!")
 								return True
-							elif len(uv) == 1:
-								if uv[0].name != 'UVMap':
-									self.report({"WARNING"}, "Mesh [%s] UVMap name isn't correct!" % ob2.name)
-									print("Mesh [%s] UVMap name isn't correct!" % ob2.name)
-									print(f"Check in {context.scene.part_info}-->{child.name}-->{ob.name}-->{ob2.name}!")
-									return True
-							elif len(uv) == 2:
-								if uv[1].name != 'normal_map':
-									self.report({"WARNING"}, "Mesh [%s] normal_map name isn't correct!" % ob2.name)
-									print("Mesh [%s] normal_map name isn't correct!" % ob2.name)
-									print(f"Check in {context.scene.part_info}-->{child.name}-->{ob.name}-->{ob2.name}!")
-									return True
+							else:
+								expected_names = FMDL_UV_LAYER_NAMES[:len(uv)]
+								for i, expected in enumerate(expected_names):
+									if uv[i].name != expected:
+										self.report({"WARNING"}, "Mesh [%s] UV channel %d name isn't correct! Expected: %s" % (ob2.name, i, expected))
+										print("Mesh [%s] UV channel %d name isn't correct! Expected: %s" % (ob2.name, i, expected))
+										print(f"Check in {context.scene.part_info}-->{child.name}-->{ob.name}-->{ob2.name}!")
+										return True
 							if len(mat) == 0:
 								self.report({"WARNING"}, "Mesh [%s] does not have an associated material!" % ob2.name)
 								print(f"Mesh {ob2.name} does not have an associated material!")
@@ -3796,13 +3949,53 @@ class Export_OT(bpy.types.Operator):
 									objName = child.name
 									fmdlName = child.name
 									try:
-										addr=hxd(transformlist[datalist.index(fmdlName)],8)
-										shearTransformaddr=hxd(shearTransform[datalist.index(fmdlName)],8)
-										pivotTransformaddr=hxd(pivotTransform[datalist.index(fmdlName)],8)
-										Transformaddr=hxd(TransformEntity[datalist.index(fmdlName)],8)
-										Stadium_Model.append(StadiumModel[datalist.index(fmdlName)])
-										Stadium_Kinds.append(StadiumKind[datalist.index(fmdlName)])
-										Stadium_Dir.append(StadiumDir[datalist.index(fmdlName)])
+										if fmdlName in datalist:
+											idx = datalist.index(fmdlName)
+											addr=hxd(transformlist[idx],8)
+											shearTransformaddr=hxd(shearTransform[idx],8)
+											pivotTransformaddr=hxd(pivotTransform[idx],8)
+											Transformaddr=hxd(TransformEntity[idx],8)
+											Stadium_Model.append(StadiumModel[idx])
+											Stadium_Kinds.append(StadiumKind[idx])
+											Stadium_Dir.append(StadiumDir[idx])
+										elif fmdlName in datalist_detail:
+											idx = datalist_detail.index(fmdlName)
+											addr=hxd(transformlist_detail[idx],8)
+											shearTransformaddr=hxd(shearTransform_detail[idx],8)
+											pivotTransformaddr=hxd(pivotTransform_detail[idx],8)
+											Transformaddr=hxd(TransformEntity_detail[idx],8)
+											Stadium_Model.append(StadiumModel_detail[idx])
+											Stadium_Kinds.append(StadiumKind_detail[idx])
+											Stadium_Dir.append(StadiumDir_detail[idx])
+										elif fmdlName in datalist_probe:
+											idx = datalist_probe.index(fmdlName)
+											addr=hxd(transformlist_probe[idx],8)
+											shearTransformaddr=hxd(shearTransform_probe[idx],8)
+											pivotTransformaddr=hxd(pivotTransform_probe[idx],8)
+											Transformaddr=hxd(TransformEntity_probe[idx],8)
+											Stadium_Model.append(StadiumModel_probe[idx])
+											Stadium_Kinds.append(StadiumKind_probe[idx])
+											Stadium_Dir.append(StadiumDir_probe[idx])
+										elif fmdlName in datalist_field:
+											idx = datalist_field.index(fmdlName)
+											addr=hxd(transformlist_field[idx],8)
+											shearTransformaddr=hxd(shearTransform_field[idx],8)
+											pivotTransformaddr=hxd(pivotTransform_field[idx],8)
+											Transformaddr=hxd(TransformEntity_field[idx],8)
+											Stadium_Model.append(StadiumModel_field[idx])
+											Stadium_Kinds.append(StadiumKind_field[idx])
+											Stadium_Dir.append(StadiumDir_field[idx])
+										elif fmdlName in datalist_cover:
+											idx = datalist_cover.index(fmdlName)
+											addr=hxd(transformlist_cover[idx],8)
+											shearTransformaddr=hxd(shearTransform_cover[idx],8)
+											pivotTransformaddr=hxd(pivotTransform_cover[idx],8)
+											Transformaddr=hxd(TransformEntity_cover[idx],8)
+											Stadium_Model.append(StadiumModel_cover[idx])
+											Stadium_Kinds.append(StadiumKind_cover[idx])
+											Stadium_Dir.append(StadiumDir_cover[idx])
+										else:
+											raise ValueError(fmdlName)
 									except Exception as msg:
 										self.report({"WARNING"}, format(msg) + " more info see => System Console (^_^)")
 										print("\n\nInfo: Need to delete "+format(msg))
@@ -3824,6 +4017,7 @@ class Export_OT(bpy.types.Operator):
 			fox2XmlPath="{0}#Win\\{1}_fpkd\\Assets\\pes16\\model\\bg\\{2}\\{3}_modelset.fox2.xml".format(exportPath,stid,stid,stid)
 			try:
 				PesFoxXML.makeXMLForStadium(fox2XmlPath, dataList, arraySize, files, shearTransformlist, pivotTransformlist, Stadium_Model,TransformEntityList,Stadium_Kinds,Stadium_Dir, enable_enlighten)
+				patchFieldToEnlighten(fox2XmlPath, stid)
 				compileXML(fox2XmlPath)
 			except Exception as msg:
 				self.report({"INFO"}, format(msg))
@@ -4171,20 +4365,16 @@ class Export_TV(bpy.types.Operator):
 							self.report({"WARNING"}, "Mesh [%s] does not have a primary UV map set!" % ob.name)
 							print("Mesh [%s] does not have a primary UV map set!" % ob.name)
 							return {'CANCELLED'}
-						elif len(uv) >= 3:
-							self.report({"WARNING"}, "Mesh [%s] too much UVMap slots, need to remove!" % ob.name)
-							print("Mesh [%s] too much UVMap slots, need to remove!" % ob.name)
+						elif len(uv) > 4:
+							self.report({"WARNING"}, "Mesh [%s] too much UVMap slots, max 4 allowed!" % ob.name)
+							print("Mesh [%s] too much UVMap slots, max 4 allowed!" % ob.name)
 							return {'CANCELLED'}
-						elif len(uv) == 1:
-							if uv[0].name != 'UVMap':
-								self.report({"WARNING"}, "Mesh [%s] UVMap name isn't correct!" % ob.name)
-								print("Mesh [%s] UVMap name isn't correct!" % ob.name)
-								return {'CANCELLED'}
-						elif len(uv) == 2:
-							if uv[1].name != 'normal_map':
-								self.report({"WARNING"}, "Mesh [%s] normal_map name isn't correct!" % ob.name)
-								print("Mesh [%s] normal_map name isn't correct!" % ob.name)
-								return {'CANCELLED'}
+						else:
+							for i, expected in enumerate(FMDL_UV_LAYER_NAMES[:len(uv)]):
+								if uv[i].name != expected:
+									self.report({"WARNING"}, "Mesh [%s] UV channel %d name isn't correct! Expected: %s" % (ob.name, i, expected))
+									print("Mesh [%s] UV channel %d name isn't correct! Expected: %s" % (ob.name, i, expected))
+									return {'CANCELLED'}
 						if len(mat) == 0:
 							self.report({"WARNING"}, "Mesh [%s] does not have an associated material!" % ob.name)
 							print("Mesh [%s] does not have an associated material!" % ob.name)
