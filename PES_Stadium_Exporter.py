@@ -656,6 +656,14 @@ def Create_Parent_Part(self, context):
 				ob.parent = bpy.data.objects["EXTRA"]	
 			elif ob.name in datalist:
 				ob.parent = bpy.data.objects["MAIN"]
+			elif ob.name in datalist_detail:
+				ob.parent = bpy.data.objects["MAIN"]
+			elif ob.name in datalist_probe:
+				ob.parent = bpy.data.objects["MAIN"]
+			elif ob.name in datalist_field:
+				ob.parent = bpy.data.objects["MAIN"]
+			elif ob.name in datalist_cover:
+				ob.parent = bpy.data.objects["MAIN"]
 			if ob.name in parent_main_list:
 				for op in main_list:
 					if op in ob.name and True:
